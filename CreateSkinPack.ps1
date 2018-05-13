@@ -4,7 +4,7 @@
 # ===================
 if(!$DIR) {
     Write-Host "Usage:" -ForegroundColor Green
-    Write-Host $MyInvocation.MyCommand.Name "<path_to_skins_directory>"
+    Write-Host $MyInvocation.MyCommand.Name "<path_to_skins_directory>" -ForegroundColor Yellow
     Write-Host "Slim/Girl skins should be in '\Slim' subdirectory"
     exit
 }
@@ -81,6 +81,23 @@ function GetId([string]$strval) {
      return $strval -replace "[^\w\d]", ""
 }
 
+function WriteSkinNames([SkinItem[]]$skins, [bool]$isSlim=$false) {
+    $count = $skins.Count
+    if ($count -gt 0) {
+        if($isSlim) {
+            Write-Host "$count slim skins found:" -ForegroundColor Green
+        }
+        else {
+            Write-Host "$count common skins found:" -ForegroundColor Green
+        }
+        Foreach($skin in $skins) {
+            Write-Host $skin.texture
+        }
+
+        Write-Host
+    }
+}
+
 # ===================
 #      Main
 # ===================
@@ -88,12 +105,14 @@ $ID = GetId $NAME
 
 $manifest = New-Object Manifest $NAME, $version
 
-$allSkins = Get-ChildItem "$DIR" -File | ForEach-Object {
+[SkinItem[]]$allSkins = Get-ChildItem "$DIR" -File | ForEach-Object {
     New-Object SkinItem -Property @{
         'localization_name' = GetId $_.BaseName
         'texture' = $_.Name
     }
 }
+
+WriteSkinNames $allSkins $false
 
 if(Test-Path "$SLIM") {
     $slimSkins = Get-ChildItem "$SLIM" -File | ForEach-Object {
@@ -103,6 +122,9 @@ if(Test-Path "$SLIM") {
             'texture' = $_.Name
         }
     }
+
+    WriteSkinNames $slimSkins $true
+
     $allSkins = $allSkins + $slimSkins
 }
 
@@ -115,18 +137,24 @@ $skinSet = New-Object SkinsSet -Property @{
 $enUsLang = $skinSet.skins | ForEach-Object { "skin.$ID." + $_.localization_name + '=' + [System.IO.Path]::GetFileNameWithoutExtension($_.texture) }
 $enUsLang += "skinpack.$ID=$NAME"
 
-Write-Host 'manifest.json:'
+Write-Host 'Create manifest.json'
 $manifestJson = ConvertTo-Json $manifest -Depth 100
-Write-Host $manifestJson -ForegroundColor Yellow
 Out-File -InputObject $manifestJson -Encoding default -FilePath "$outDir\manifest.json"
-Write-Host 'skins.json:'
+
+Write-Host 'Create skins.json'
 $skinSetJson = ConvertTo-Json $skinSet -Depth 100
-Write-Host $skinSetJson -ForegroundColor Green
 Out-File -InputObject $skinSetJson -Encoding default -FilePath "$outDir\skins.json"
-Write-Host 'en_US.lang:'
-$enUsLang -join "`n" | Write-Host -ForegroundColor Cyan
+
+Write-Host 'Create en_US.lang'
 Out-File -InputObject $enUsLang -Encoding default -FilePath "$outDirTexts\en_US.lang"
+
+Write-Host "Compress temporary dir '$outDir'"
 Compress-Archive -Path "$outDir\**" -DestinationPath "$outDir.zip" -Force
 if(Test-Path "$outDir.mcpack") { Remove-Item "$outDir.mcpack" }
 Rename-Item -Path "$outDir.zip" -NewName "$outDir.mcpack" -Force
+Write-Host "Package '$outDir.mcpack' created" -ForegroundColor Green
+
+Write-Host "Remove temporary folder '$outdir'"
 Remove-Item $outDir -Recurse
+
+Write-Host "Finished" -ForegroundColor Green
