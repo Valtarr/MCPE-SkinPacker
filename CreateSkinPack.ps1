@@ -1,13 +1,24 @@
-﻿param([string]$DIR)
+param([string]$DIR)
 # ===================
 #  Parse params
 # ===================
 if(!$DIR) {
-    Write-Host "Usage:" -ForegroundColor Green
-    Write-Host $MyInvocation.MyCommand.Name "<path_to_skins_directory>" -ForegroundColor Yellow
-    Write-Host "Slim/Girl skins should be in '\Slim' subdirectory"
-    exit
+    Add-Type -AssemblyName System.Windows.Forms
+    $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $folderDialog.Description = 'Select the folder containing skins'
+    $result = $folderDialog.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost = $true }))
+    if ($result -eq [Windows.Forms.DialogResult]::OK){
+        $DIR = $folderDialog.SelectedPath
+    }
+    else {
+        Write-Host "Usage:" -ForegroundColor Green
+        Write-Host $MyInvocation.MyCommand.Name "<path_to_skins_directory>" -ForegroundColor Yellow
+        Write-Host "Slim/Girl skins should be in '\Slim' subdirectory"
+        exit
+    }
 }
+
+Write-Host "Skins directory: $DIR" -ForegroundColor Green
 
 if(!(Test-Path $DIR)) {
     Write-Host "Folder '$DIR' does not exist" -ForegroundColor Red
@@ -19,7 +30,7 @@ $DIR = $DIR.Trim('\', '/')
 # ===================
 #  Global variables
 # ===================
-[int[]]$version = 1,0,0 # SkinPacks are not updateble, so no sence to change version
+[int[]]$version = 1,0,0 # SkinPacks are not updatable, so no sence to change version
 $NAME = [System.IO.Path]::GetFileNameWithoutExtension($DIR)
 $SLIM="$DIR\Slim"
 $geometrySlim="geometry.humanoid.customSlim"
@@ -77,11 +88,11 @@ class SkinItem {
 
 }
 
-function GetId([string]$strval) {
+function Get-SkinId([string]$strval) {
      return $strval -replace "[^\w\d]", ""
 }
 
-function WriteSkinNames([SkinItem[]]$skins, [bool]$isSlim=$false) {
+function Write-SkinNames([SkinItem[]]$skins, [bool]$isSlim=$false) {
     $count = $skins.Count
     if ($count -gt 0) {
         if($isSlim) {
@@ -101,29 +112,29 @@ function WriteSkinNames([SkinItem[]]$skins, [bool]$isSlim=$false) {
 # ===================
 #      Main
 # ===================
-$ID = GetId $NAME
+$ID = Get-SkinId $NAME
 
 $manifest = New-Object Manifest $NAME, $version
 
 [SkinItem[]]$allSkins = Get-ChildItem "$DIR" -File | ForEach-Object {
     New-Object SkinItem -Property @{
-        'localization_name' = GetId $_.BaseName
+        'localization_name' = Get-SkinId $_.BaseName
         'texture' = $_.Name
     }
 }
 
-WriteSkinNames $allSkins $false
+Write-SkinNames $allSkins $false
 
 if(Test-Path "$SLIM") {
     $slimSkins = Get-ChildItem "$SLIM" -File | ForEach-Object {
         New-Object SkinItem -Property @{
-            'localization_name' = GetId $_.BaseName
+            'localization_name' = Get-SkinId $_.BaseName
             'geometry' = $geometrySlim
             'texture' = $_.Name
         }
     }
 
-    WriteSkinNames $slimSkins $true
+    Write-SkinNames $slimSkins $true
 
     $allSkins = $allSkins + $slimSkins
 }
